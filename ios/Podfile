@@ -4,6 +4,8 @@ require_relative '../node_modules/@react-native-community/cli-platform-ios/nativ
 platform :ios, '12.4'
 install! 'cocoapods', :deterministic_uuids => false
 
+use_frameworks! :linkage => :static
+
 target 'skiaTest' do
   config = use_native_modules!
 
@@ -21,7 +23,7 @@ target 'skiaTest' do
     #
     # Note that if you have use_frameworks! enabled, Flipper will not work and
     # you should disable the next line.
-    :flipper_configuration => FlipperConfiguration.enabled,
+    # :flipper_configuration => FlipperConfiguration.enabled,
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
@@ -32,12 +34,39 @@ target 'skiaTest' do
   pod 'Permission-LocationAccuracy', :path => "#{permissions_path}/LocationAccuracy"
   pod 'Permission-LocationAlways', :path => "#{permissions_path}/LocationAlways"
   pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
-  pod 'react-native-google-cast/NoBluetoothArm', path: '../node_modules/react-native-google-cast/'
 
   target 'skiaTestTests' do
     inherit! :complete
     # Pods for testing
   end
+
+  $static_library = [
+    'React',
+    'react-native-skia/Api',
+    'react-native-skia/Jsi',
+    'react-native-skia/RNSkia',
+    'react-native-skia/SkiaHeaders',
+    'react-native-skia/Utils',
+    'react-native-skia',
+   ]
+ 
+ pre_install do |installer|
+       Pod::Installer::Xcode::TargetValidator.send(:define_method, :verify_no_static_framework_transitive_dependencies) {}
+       installer.pod_targets.each do |pod|
+         bt = pod.send(:build_type)
+         if $static_library.include?(pod.name)
+           puts "Overriding the build_type to static_library from static_framework for #{pod.name}"
+           def pod.build_type;
+             Pod::BuildType.static_library
+           end
+         end
+       end
+       installer.pod_targets.each do |pod|
+         bt = pod.send(:build_type)
+         puts "#{pod.name} (#{bt})"
+         puts "  linkage: #{bt.send(:linkage)} packaging: #{bt.send(:packaging)}"
+       end
+   end
 
   post_install do |installer|
     react_native_post_install(
